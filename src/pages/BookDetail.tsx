@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
-import { Book } from "@/types";
+import { Book, BookLoan } from "@/types";
 import { booksApi, bookLoansApi, feedbackApi, authApi } from "@/utils/api";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,13 +36,13 @@ import {
 const BookDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [book, setBook] = useState<Book | null>(null);
+  const [loans, setLoans] = useState<BookLoan[]>([]);
   const [loading, setLoading] = useState(true);
   const [requestLoading, setRequestLoading] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState("");
-  const [showFeedbackSuccess, setShowFeedbackSuccess] = useState(false);
   const [showLoanSuccess, setShowLoanSuccess] = useState(false);
 
   useEffect(() => {
@@ -54,6 +54,14 @@ const BookDetail: React.FC = () => {
     setIsAuthenticated(authApi.isAuthenticated());
   }, [id]);
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  };
   const fetchBook = async (bookId: number) => {
     setLoading(true);
     try {
@@ -70,10 +78,16 @@ const BookDetail: React.FC = () => {
     setLoading(true);
     try {
       const response = await feedbackApi.getFeedbackByBookId(bookId);
-      if (response) {
+      if (response?.data) {
+        const transformedFeedback = response.data.map((fb) => ({
+          rating: fb.rating,
+          review: fb.comment,
+          createAt: fb.createdAt,
+          user: fb.user ? { name: fb.user.name } : null,
+        }));
         setBook((prevBook) => ({
           ...prevBook,
-          feedback: response,
+          feedback: transformedFeedback,
         }));
       }
     } finally {
@@ -106,9 +120,7 @@ const BookDetail: React.FC = () => {
       if (success) {
         setRating(0);
         setReview("");
-        setShowFeedbackSuccess(true);
-        // Hide success message after 5 seconds
-        setTimeout(() => setShowFeedbackSuccess(false), 5000);
+        await fetchFeedback(book.id);
       }
     } finally {
       setReviewLoading(false);
@@ -141,7 +153,8 @@ const BookDetail: React.FC = () => {
       </Layout>
     );
   }
-  console.log("book", book);
+  console.log("book feedback", book.feedback);
+  console.log("book length", book.feedback?.length);
   return (
     <Layout>
       <div className="mb-6">
@@ -160,80 +173,104 @@ const BookDetail: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div className="flex flex-wrap gap-2 mb-4">
-              {book.hasPhysical === 1 && (
-                <span className="badge-physical">Physical</span>
-              )}
-              {(book.ebook || book.has_pdf === 1) && (
-                <span className="badge-ebook">eBook</span>
-              )}
-              <span className="bg-gray-100 text-gray-600 px-2 py-0.5 text-xs rounded-full">
-                {book.category}
-              </span>
-            </div>
+            <div className="flex gap-8 mb-6">
+              <div className="w-48 h-64 bg-library-light/10 flex-shrink-0 rounded-lg overflow-hidden">
+                {book.thumbnail ? (
+                  <img
+                    src={book.thumbnail}
+                    alt={book.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <BookOpen size={60} className="text-library-DEFAULT/50" />
+                  </div>
+                )}
+              </div>
 
-            <h1 className="text-3xl font-bold text-library-DEFAULT mb-2">
-              {book.title}
-            </h1>
-            <p className="text-xl text-gray-600 mb-6">by {book.author}</p>
+              <div>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {book.hasPhysical === 1 && (
+                    <span className="badge-physical">Physical</span>
+                  )}
+                  {(book.ebook || book.has_pdf === 1) && (
+                    <span className="badge-ebook">eBook</span>
+                  )}
 
-            <h2 className="text-xl font-semibold mb-3">Description</h2>
-            <p className="text-gray-700 mb-6">{book.description}</p>
+                  <span className="bg-gray-100 text-gray-600 px-2 py-0.5 text-xs rounded-full">
+                    {book.category}
+                  </span>
+                </div>
 
-            {showLoanSuccess && (
-              <div className="bg-green-50 border border-green-200 text-green-700 p-4 rounded-md mb-6 flex items-start">
-                <Check className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="font-medium">
-                    Book request submitted successfully!
-                  </p>
-                  <p className="text-sm">
-                    You will be notified once your request is approved.
-                  </p>
+                <h1 className="text-3xl font-bold text-library-DEFAULT mb-2">
+                  {book.title}
+                </h1>
+                <p className="text-xl text-gray-600 mb-6">by {book.author}</p>
+
+                <h2 className="text-xl font-semibold mb-3">Description</h2>
+                <p className="text-gray-700 mb-6">{book.description}</p>
+
+                {showLoanSuccess && (
+                  <div className="bg-green-50 border border-green-200 text-green-700 p-4 rounded-md mb-6 flex items-start">
+                    <Check className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium">
+                        Book request submitted successfully!
+                      </p>
+                      <p className="text-sm">
+                        You will be notified once your request is approved.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-3">
+                  {book.hasPhysical === 1 && (
+                    <Button
+                      onClick={handleRequestBook}
+                      disabled={
+                        requestLoading ||
+                        !isAuthenticated ||
+                        (book.quantity !== null && book.quantity <= 0)
+                      }
+                      className="bg-library-DEFAULT hover:bg-library-light"
+                    >
+                      {requestLoading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Requesting...
+                        </>
+                      ) : (
+                        <>
+                          <BookOpen className="h-4 w-4 mr-2" />
+                          Request Physical Book
+                        </>
+                      )}
+                    </Button>
+                  )}
+
+                  {(book.ebook || book.has_pdf === 1) && (
+                    <Button
+                      disabled={!isAuthenticated || !book.ebook}
+                      variant="outline"
+                      onClick={() =>
+                        book.ebook && window.open(book.ebook, "_blank")
+                      }
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      {book.ebook ? "Download eBook" : "eBook Not Available"}
+                    </Button>
+                  )}
+                  {!isAuthenticated && (
+                    <div className="w-full mt-3 text-sm text-amber-600 bg-amber-50 p-3 rounded-md border border-amber-200">
+                      <Link to="/login" className="font-medium underline">
+                        Sign in
+                      </Link>{" "}
+                      to request or download this book
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
-
-            <div className="flex flex-wrap gap-3">
-              {book.hasPhysical === 1 && (
-                <Button
-                  onClick={handleRequestBook}
-                  disabled={
-                    requestLoading ||
-                    !isAuthenticated ||
-                    (book.quantity !== null && book.quantity <= 0)
-                  }
-                  className="bg-library-DEFAULT hover:bg-library-light"
-                >
-                  {requestLoading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Requesting...
-                    </>
-                  ) : (
-                    <>
-                      <BookOpen className="h-4 w-4 mr-2" />
-                      Request Physical Book
-                    </>
-                  )}
-                </Button>
-              )}
-
-              {(book.ebook || book.has_pdf === 1) && (
-                <Button disabled={!isAuthenticated} variant="outline">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download eBook
-                </Button>
-              )}
-
-              {!isAuthenticated && (
-                <div className="w-full mt-3 text-sm text-amber-600 bg-amber-50 p-3 rounded-md border border-amber-200">
-                  <Link to="/login" className="font-medium underline">
-                    Sign in
-                  </Link>{" "}
-                  to request or download this book
-                </div>
-              )}
             </div>
           </div>
 
@@ -246,118 +283,103 @@ const BookDetail: React.FC = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {showFeedbackSuccess ? (
-                  <div className="bg-green-50 border border-green-200 text-green-700 p-4 rounded-md flex items-start">
-                    <Check className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-medium">
-                        Thank you for your feedback!
-                      </p>
-                      <p className="text-sm">
-                        Your rating and review have been submitted successfully.
-                      </p>
+                <>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium mb-2">
+                      Rating
+                    </label>
+                    <div className="flex gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setRating(star)}
+                          className={`p-1 rounded-full hover:bg-gray-100 transition-colors`}
+                        >
+                          <Star
+                            className={`h-6 w-6 ${
+                              star <= rating
+                                ? "fill-library-accent text-library-accent"
+                                : "text-gray-300"
+                            }`}
+                          />
+                        </button>
+                      ))}
                     </div>
                   </div>
-                ) : (
-                  <>
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium mb-2">
-                        Rating
-                      </label>
-                      <div className="flex gap-1">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <button
-                            key={star}
-                            type="button"
-                            onClick={() => setRating(star)}
-                            className={`p-1 rounded-full hover:bg-gray-100 transition-colors`}
-                          >
-                            <Star
-                              className={`h-6 w-6 ${
-                                star <= rating
-                                  ? "fill-library-accent text-library-accent"
-                                  : "text-gray-300"
-                              }`}
-                            />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
 
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium mb-2">
-                        Review
-                      </label>
-                      <Textarea
-                        value={review}
-                        onChange={(e) => setReview(e.target.value)}
-                        placeholder="Share your thoughts about this book..."
-                        className="min-h-[100px]"
-                      />
-                    </div>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium mb-2">
+                      Review
+                    </label>
+                    <Textarea
+                      value={review}
+                      onChange={(e) => setReview(e.target.value)}
+                      placeholder="Share your thoughts about this book..."
+                      className="min-h-[100px]"
+                    />
+                  </div>
 
-                    <Button
-                      onClick={handleSubmitFeedback}
-                      disabled={reviewLoading || rating === 0}
-                      className="w-full"
-                    >
-                      {reviewLoading ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Submitting...
-                        </>
-                      ) : (
-                        "Submit Review"
-                      )}
-                    </Button>
-                    {book.feedback && book.feedback.length > 0 && (
-                      <Card className="mb-6">
-                        <CardHeader>
-                          <CardTitle>Reader Feedback</CardTitle>
-                          <CardDescription>
-                            See What other readers have said about this book
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          {book.feedback.map((feedback, index) => (
-                            <div
-                              key={index}
-                              className="border-b last:border-b-0 pb-4 last:pb-0"
-                            >
-                              <div className="flex items-center mb-2">
-                                <div className="flex gap-1 mr-2">
-                                  {[1, 2, 3, 4, 5].map((star) => (
-                                    <Star
-                                      key={star}
-                                      className={`h-4 w-4 ${
-                                        star <= feedback.rating
-                                          ? "fill-library-accent text-library-accent"
-                                          : "text-gray-300"
-                                      }`}
-                                    />
-                                  ))}
-                                </div>
-                                <span>
-                                  {feedback.createAt
-                                    ? new Date(
-                                        feedback.createAt
-                                      ).toLocaleDateString()
-                                    : "Data Not Available"}
-                                </span>
-                              </div>
-                              <p className="text-gray-700">{feedback.review}</p>
-                              {feedback.user && (
-                                <p className="text-sm text-gray-500 mt-1">
-                                  — {feedback.user.name || "Anonymous"}
-                                </p>
-                              )}
-                            </div>
-                          ))}
-                        </CardContent>
-                      </Card>
+                  <Button
+                    onClick={handleSubmitFeedback}
+                    disabled={reviewLoading || rating === 0}
+                    className="w-full"
+                  >
+                    {reviewLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      "Submit Review"
                     )}
-                  </>
-                )}
+                  </Button>
+
+                  {book.feedback && book.feedback.length > 0 && (
+                    <Card className="mb-6">
+                      <CardHeader>
+                        <CardTitle>Reader Feedback</CardTitle>
+                        <CardDescription>
+                          See What other readers have said about this book
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {book.feedback.map((feedback, index) => (
+                          <div
+                            key={index}
+                            className="border-b last:border-b-0 pb-4 last:pb-0"
+                          >
+                            <div className="flex items-center mb-2">
+                              <div className="flex gap-1 mr-2">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <Star
+                                    key={star}
+                                    className={`h-4 w-4 ${
+                                      star <= feedback.rating
+                                        ? "fill-library-accent text-library-accent"
+                                        : "text-gray-300"
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                              <span>
+                                {feedback.createAt
+                                  ? formatDate(feedback.createAt)
+                                  : "Data Not Available"}
+                              </span>
+                            </div>
+                            <p className="text-gray-700">{feedback.review}</p>
+                            {feedback.user && (
+                              <p className="text-sm text-gray-500 mt-1">
+                                — {feedback.user.name || "Anonymous"}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
               </CardContent>
             </Card>
           )}
@@ -419,7 +441,7 @@ const BookDetail: React.FC = () => {
                 <p className="text-sm text-gray-500">Added On</p>
                 <div className="flex items-center">
                   <Calendar className="h-4 w-4 mr-1 text-gray-500" />
-                  <span>{new Date(book.createdAt).toLocaleDateString()}</span>
+                  <span>{formatDate(book.createdAt)}</span>
                 </div>
               </div>
             </CardContent>
@@ -427,27 +449,68 @@ const BookDetail: React.FC = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Loan Policy</CardTitle>
+              <CardTitle>Loan Information</CardTitle>
+              <CardDescription>
+                Policy details and current loan status
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-start">
-                <Clock className="h-5 w-5 mr-2 text-gray-500 mt-0.5" />
-                <div>
-                  <p className="font-medium">Loan Duration</p>
-                  <p className="text-sm text-gray-500">
-                    Physical books can be borrowed for up to 14 days
-                  </p>
+            <CardContent className="space-y-6">
+              {/* Loan Policy Section */}
+              <div>
+                <h3 className="text-sm font-semibold mb-3">Policy Rules</h3>
+                <div className="space-y-4">
+                  <div className="flex items-start">
+                    <Clock className="h-5 w-5 mr-2 text-library-DEFAULT/70 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-sm">Loan Duration</p>
+                      <p className="text-sm text-gray-500">
+                        Physical books can be borrowed for up to 7 days
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <Calendar className="h-5 w-5 mr-2 text-library-DEFAULT/70 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-sm">Extension Policy</p>
+                      <p className="text-sm text-gray-500">
+                        One-time extension available before due date
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="flex items-start">
-                <Calendar className="h-5 w-5 mr-2 text-gray-500 mt-0.5" />
-                <div>
-                  <p className="font-medium">Extensions</p>
-                  <p className="text-sm text-gray-500">
-                    You can request an extension before the due date
-                  </p>
-                </div>
-              </div>
+
+              {/* Current Loans Section */}
+              {!book.quantity &&
+                book.bookLoans &&
+                book.bookLoans.length > 0 && (
+                  <div className="border-t pt-4">
+                    <h3 className="text-sm font-semibold mb-3">Active Loans</h3>
+                    <div className="space-y-3">
+                      {book.bookLoans.slice(0, 3).map((loan) => (
+                        <div
+                          key={loan.id}
+                          className="flex items-start p-3 bg-gray-50 rounded-md"
+                        >
+                          <Calendar className="h-4 w-4 mr-2 text-library-DEFAULT/70 mt-1" />
+                          <div>
+                            <p className="text-sm font-medium">
+                              Due: {formatDate(loan.due_date)}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Borrowed by: {loan.user?.name || "Unknown"}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                      {book.bookLoans.length > 3 && (
+                        <p className="text-xs text-gray-500 italic">
+                          + {book.bookLoans.length - 3} more active loans
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
             </CardContent>
           </Card>
         </div>

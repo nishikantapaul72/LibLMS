@@ -6,10 +6,11 @@ import {
   User,
   ValidationError,
   ApiResponse,
+  Feedback,
 } from "@/types";
 
 // Base API URL - replace with your actual API URL in production
-const API_BASE_URL = "http://gh1jnuqw4x.laravel-sail.site:8080/api/v1";
+const API_BASE_URL = "http://libms.laravel-sail.site:8080/api/v1";
 
 // Add this after the API_BASE_URL constant
 const getHeaders = (includeContentType = false) => {
@@ -29,8 +30,15 @@ const getHeaders = (includeContentType = false) => {
 // Helper to get the stored auth token
 const getToken = () => localStorage.getItem("library_token");
 
+interface ApiError {
+  response?: {
+    data?: ValidationError & {
+      message?: string;
+    };
+  };
+}
 // Helper to handle API errors
-const handleApiError = (error: any) => {
+const handleApiError = (error: ApiError) => {
   if (error.response?.data?.errors) {
     // Handle validation errors
     const validationError = error.response.data as ValidationError;
@@ -108,6 +116,7 @@ export const booksApi = {
   async getBooks(
     page = 1,
     searchQuery = ""
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<{ data: Book[]; meta: any } | null> {
     try {
       const token = getToken();
@@ -163,7 +172,7 @@ export const bookLoansApi = {
         return false;
       }
 
-      const response = await fetch(`${API_BASE_URL}/book-loans`, {
+      const response = await fetch(`${API_BASE_URL}/book-loan-request`, {
         method: "POST",
         headers: getHeaders(true),
         body: JSON.stringify({ book_id: bookId }),
@@ -189,15 +198,15 @@ export const bookLoansApi = {
 
   async getLoans(
     status?: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<{ data: BookLoan[]; meta: any } | null> {
     try {
       const token = getToken();
       if (!token) return null;
 
-      let url = `${API_BASE_URL}/book-loans`;
-      if (status) {
-        url += `?status=${status}`;
-      }
+      const url = status
+        ? `${API_BASE_URL}/book-loans?status=${encodeURIComponent(status)}`
+        : `${API_BASE_URL}/book-loans`;
 
       const response = await fetch(url, {
         headers: getHeaders(),
@@ -214,17 +223,23 @@ export const bookLoansApi = {
     }
   },
 
-  async requestExtension(loanId: number, newDate: string): Promise<boolean> {
+  async requestExtension(
+    loanId: number,
+    newDate: string,
+    Reason: string
+  ): Promise<boolean> {
+    console.log("Requesting extension for loan ID:", loanId);
+    console.log("New date:", newDate);
+    console.log("Reason:", Reason);
     try {
       const token = getToken();
       if (!token) return false;
-
       const response = await fetch(
-        `${API_BASE_URL}/book-loans/${loanId}/extend`,
+        `${API_BASE_URL}/book-loans/${loanId}/request-due-date`,
         {
-          method: "PATCH",
+          method: "PUT",
           headers: getHeaders(true),
-          body: JSON.stringify({ due_date: newDate }),
+          body: JSON.stringify({ dueDate: newDate, reason: Reason }),
         }
       );
 
@@ -312,14 +327,13 @@ export const feedbackApi = {
       return false;
     }
   },
-  async getFeedbackByBookId(bookId: number): Promise<BookLoan[] | null> {
+  async getFeedbackByBookId(
+    bookId: number
+  ): Promise<ApiResponse<Feedback[] | null>> {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/books/${bookId}/feedback`,
-        {
-          headers: getHeaders(),
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/books/${bookId}/feedback`, {
+        headers: getHeaders(),
+      });
 
       if (!response.ok) {
         throw { response };

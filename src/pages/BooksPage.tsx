@@ -1,10 +1,11 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 
 import React, { useEffect, useState } from 'react';
 import Layout from '@/components/Layout';
 import BookCard from '@/components/BookCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Book } from '@/types';
+import { Book} from '@/types';
 import { booksApi } from '@/utils/api';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Search, Filter, BookOpen, Loader2 } from 'lucide-react';
@@ -52,6 +53,7 @@ const BooksPage: React.FC = () => {
     setLoading(true);
     try {
       const response = await booksApi.getBooks(page, search);
+      console.log('Books response:', response);
       if (response) {
         setBooks(response.data);
         setCurrentPage(response.meta.current_page);

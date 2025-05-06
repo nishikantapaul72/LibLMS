@@ -13,7 +13,15 @@ const BookCard: React.FC<BookCardProps> = ({ book }) => {
   return (
     <div className="book-card rounded-lg border border-gray-200 overflow-hidden bg-white shadow hover:shadow-lg">
       <div className="h-40 bg-library-light/10 flex items-center justify-center">
-        <BookOpen size={60} className="text-library-DEFAULT/50" />
+        {book.thumbnail ? (
+          <img
+            src={book.thumbnail}
+            alt={book.title}
+            className="object-cover w-full h-full"
+          />
+        ) : (
+          <BookOpen size={60} className="text-library-DEFAULT/50" />
+        )}
       </div>
       <div className="p-4">
         <div className="flex flex-wrap gap-2 mb-2">

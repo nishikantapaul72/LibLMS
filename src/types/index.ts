@@ -11,13 +11,27 @@ export interface Book {
   title: string;
   author: string;
   description: string;
-  has_pdf?: number; // Legacy field (0 or 1)
-  ebook?: string | null; // New field (URL or null)
-  hasPhysical: number; // 0 or 1
+  has_pdf?: number;
+  ebook?: string | null;
+  hasPhysical: number;
   category: string;
   quantity: number;
   physicalStock: number | null;
   createdAt: string;
+  thumbnail: string | null;
+  feedback?: Array<{
+    rating: number;
+    review: string;
+    createAt?: string;
+    user?: { name: string } | null;
+  }>;
+  bookLoans?: Array<{
+    id: number;
+    due_date: string;
+    user?: {
+      name: string;
+    };
+  }>;
 }
 
 export interface BookLoan {
@@ -41,8 +55,9 @@ export interface Feedback {
   user_id: number;
   book_id: number;
   rating: number;
-  review: string;
-  submitted_at: string;
+  comment: string;
+  createdAt: string;
+  user?: User;
 }
 
 export interface AuthResponse {
@@ -64,6 +79,6 @@ export interface ApiError {
 }
 
 export interface ApiResponse<T> {
-  message: string;
+  message?: string;
   data: T;
 }
