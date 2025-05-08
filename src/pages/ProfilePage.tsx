@@ -1,56 +1,91 @@
-
-import React, { useEffect, useState } from 'react';
-import Layout from '@/components/Layout';
-import { authApi } from '@/utils/api';
-import { User } from '@/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useNavigate } from 'react-router-dom';
-import { Loader2, User as UserIcon, Mail, Key, ShieldCheck } from 'lucide-react';
+import React, { useEffect, useState } from "react";
+import Layout from "@/components/Layout";
+import { authApi } from "@/utils/api";
+import { User, UserStats } from "@/types";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useNavigate } from "react-router-dom";
+import {
+  Loader2,
+  User as UserIcon,
+  Mail,
+  Key,
+  ShieldCheck,
+} from "lucide-react";
 
 const ProfilePage: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [password, setPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
-  const [passwordError, setPasswordError] = useState('');
+  const [passwordError, setPasswordError] = useState("");
+  const [stats, setStats] = useState<UserStats | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     const currentUser = authApi.getCurrentUser();
     if (!currentUser) {
-      navigate('/login');
+      navigate("/login");
       return;
     }
-    
+
     setUser(currentUser);
     setIsLoading(false);
   }, [navigate]);
 
-  const handlePasswordUpdate = (e: React.FormEvent) => {
+  useEffect(() => {
+    const fetchUserStats = async () => {
+      setIsLoading(true);
+      try {
+        const response = await authApi.getUserStats();
+        if (response?.data) {
+          setStats(response.data);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchUserStats();
+    }
+  }, [user]);
+  const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    setPasswordError('');
-    
+    setPasswordError("");
+
     if (newPassword !== confirmPassword) {
-      setPasswordError('New passwords do not match');
+      setPasswordError("New passwords do not match");
       return;
     }
-    
+
     setIsUpdating(true);
-    
-    // In a real app, call the API to update the password
-    // For now, just simulate a success after a delay
-    setTimeout(() => {
+
+    try {
+      const success = await authApi.changePassword(
+        password,
+        newPassword,
+        confirmPassword
+      );
+      if (success) {
+        // Reset form
+        setPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      }
+    } finally {
       setIsUpdating(false);
-      setPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      // Show success toast
-    }, 1500);
+    }
   };
 
   if (isLoading) {
@@ -102,10 +137,10 @@ const ProfilePage: React.FC = () => {
                   </div>
                 </div>
                 <div className="pt-2">
-                  <Button 
+                  <Button
                     onClick={() => {
                       authApi.logout();
-                      navigate('/');
+                      navigate("/");
                     }}
                     variant="outline"
                     className="w-full"
@@ -128,7 +163,7 @@ const ProfilePage: React.FC = () => {
               <form onSubmit={handlePasswordUpdate} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="current-password">Current Password</Label>
-                  <Input 
+                  <Input
                     id="current-password"
                     type="password"
                     value={password}
@@ -136,10 +171,10 @@ const ProfilePage: React.FC = () => {
                     required
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="new-password">New Password</Label>
-                  <Input 
+                  <Input
                     id="new-password"
                     type="password"
                     value={newPassword}
@@ -147,22 +182,26 @@ const ProfilePage: React.FC = () => {
                     required
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="confirm-password">Confirm New Password</Label>
-                  <Input 
+                  <Input
                     id="confirm-password"
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
                   />
-                  {passwordError && <p className="text-sm text-red-500">{passwordError}</p>}
+                  {passwordError && (
+                    <p className="text-sm text-red-500">{passwordError}</p>
+                  )}
                 </div>
-                
-                <Button 
-                  type="submit" 
-                  disabled={isUpdating || !password || !newPassword || !confirmPassword}
+
+                <Button
+                  type="submit"
+                  disabled={
+                    isUpdating || !password || !newPassword || !confirmPassword
+                  }
                 >
                   {isUpdating ? (
                     <>
@@ -170,7 +209,7 @@ const ProfilePage: React.FC = () => {
                       Updating...
                     </>
                   ) : (
-                    'Update Password'
+                    "Update Password"
                   )}
                 </Button>
               </form>
@@ -186,15 +225,33 @@ const ProfilePage: React.FC = () => {
               <div className="space-y-4">
                 <div className="border-b pb-4">
                   <p className="text-sm text-gray-500">Active Loans</p>
-                  <p className="font-semibold text-xl">0</p>
+                  <p className="font-semibold text-xl">
+                    {stats?.totalActiveLoan || 0}
+                  </p>
                 </div>
                 <div className="border-b pb-4">
                   <p className="text-sm text-gray-500">Books Returned</p>
-                  <p className="font-semibold text-xl">0</p>
+                  <p className="font-semibold text-xl">
+                    {stats?.totalReturnedLoan || 0}
+                  </p>
+                </div>
+                <div className="border-b pb-4">
+                  <p className="text-sm text-gray-500">Pending Requests</p>
+                  <p className="font-semibold text-xl">
+                    {stats?.totalPendingLoan || 0}
+                  </p>
+                </div>
+                <div className="border-b pb-4">
+                  <p className="text-sm text-gray-500">Overdue Books</p>
+                  <p className="font-semibold text-xl text-red-500">
+                    {stats?.totalOverDueLoan || 0}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Reviews Written</p>
-                  <p className="font-semibold text-xl">0</p>
+                  <p className="font-semibold text-xl">
+                    {stats?.totalReviewWritten || 0}
+                  </p>
                 </div>
               </div>
 

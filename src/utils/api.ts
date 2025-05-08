@@ -7,7 +7,10 @@ import {
   ValidationError,
   ApiResponse,
   Feedback,
+  UserStats,
+  Category,
 } from "@/types";
+import { format } from "path";
 
 // Base API URL - replace with your actual API URL in production
 const API_BASE_URL = "http://libms.laravel-sail.site:8080/api/v1";
@@ -109,14 +112,106 @@ export const authApi = {
   isAuthenticated(): boolean {
     return !!getToken();
   },
+
+  async changePassword(
+    oldPassword: string,
+    newPassword: string,
+    confirmPassword: string
+  ): Promise<boolean> {
+    try {
+      if (newPassword.length < 8) {
+        toast({
+          title: "Validation Error",
+          description: "New password must be at least 8 characters long",
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      if (newPassword !== confirmPassword) {
+        toast({
+          title: "Validation Error",
+          description: "Passwords do not match",
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/users/change-password`, {
+        method: "PUT",
+        headers: getHeaders(true),
+        body: JSON.stringify({
+          old_password: oldPassword,
+          new_password: newPassword,
+          confirm_password: confirmPassword,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw { response: { data } };
+      }
+
+      toast({
+        title: "Success",
+        description: data.message || "Password updated successfully",
+      });
+
+      return true;
+    } catch (error) {
+      handleApiError(error);
+      return false;
+    }
+  },
+  async getUserStats(): Promise<ApiResponse<UserStats> | null> {
+    try {
+      const token = getToken();
+      if (!token) return null;
+
+      const response = await fetch(`${API_BASE_URL}/users/stats`, {
+        headers: getHeaders(),
+      });
+
+      if (!response.ok) {
+        throw { response };
+      }
+
+      return await response.json();
+    } catch (error) {
+      handleApiError(error);
+      return null;
+    }
+  },
 };
 
+//Categories API
+export const categoriesApi = {
+  async getCategories(): Promise<ApiResponse<Category[]> | null> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/categories`, {
+        headers: getHeaders(),
+      });
+
+      if (!response.ok) {
+        throw { response };
+      }
+
+      return await response.json();
+    } catch (error) {
+      handleApiError(error);
+      return null;
+    }
+  },
+};
 // Books API
 export const booksApi = {
   async getBooks(
     page = 1,
-    searchQuery = ""
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    searchQuery = "",
+    categoryId?: number,
+    format?: string
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<{ data: Book[]; meta: any } | null> {
     try {
       const token = getToken();
@@ -124,7 +219,12 @@ export const booksApi = {
       if (searchQuery) {
         url += `&search=${encodeURIComponent(searchQuery)}`;
       }
-
+      if (categoryId) {
+        url += `&category_id=${categoryId}`;
+      }
+      if (format) {
+        url += `&format=${format}`;
+      }
       const response = await fetch(url, {
         headers: getHeaders(),
       });
@@ -198,7 +298,7 @@ export const bookLoansApi = {
 
   async getLoans(
     status?: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<{ data: BookLoan[]; meta: any } | null> {
     try {
       const token = getToken();

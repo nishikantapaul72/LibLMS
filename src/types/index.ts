@@ -6,6 +6,21 @@ export interface User {
   created_at: string;
 }
 
+export interface UserStats {
+  totalPendingLoan: number;
+  totalActiveLoan: number;
+  totalReturnedLoan: number;
+  totalOverDueLoan: number;
+  totalReviewWritten: number;
+}
+
+export interface Category {
+  id: number;
+  name: string;
+  bookCount: number;
+  createdAt: string;
+}
+
 export interface Book {
   id: number;
   title: string;

@@ -35,6 +35,7 @@ import { Input } from "@/components/ui/input";
 import { format, addDays } from "date-fns";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import App from "./../App";
 
 function getStatusIcon(status: string) {
   switch (status) {
@@ -46,6 +47,8 @@ function getStatusIcon(status: string) {
       return <XCircle className="h-5 w-5 text-red-500" />;
     case "returned":
       return <ArrowLeftCircle className="h-5 w-5 text-blue-500" />;
+    case "pre-approved":
+      return <CheckCircle2 className="h-5 w-5 text-green-500" />;
     default:
       return <Ban className="h-5 w-5 text-gray-400" />;
   }
@@ -61,6 +64,8 @@ function getStatusClass(status: string) {
       return "text-red-700 bg-red-50 border-red-200";
     case "returned":
       return "text-blue-700 bg-blue-50 border-blue-200";
+    case "pre-approved":
+      return "text-green-700 bg-green-50 border-green-200";
     default:
       return "text-gray-700 bg-gray-50 border-gray-200";
   }
@@ -80,6 +85,14 @@ const LoanHistory: React.FC = () => {
     fetchLoans();
   }, [activeTab]);
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  };
   const fetchLoans = async () => {
     setLoading(true);
     try {
@@ -167,6 +180,7 @@ const LoanHistory: React.FC = () => {
         <TabsList className="mb-6">
           <TabsTrigger value="all">All Loans</TabsTrigger>
           <TabsTrigger value="pending">Pending</TabsTrigger>
+          <TabsTrigger value={"pre-approved"}>Pre-Approved</TabsTrigger>
           <TabsTrigger value="approved">Active</TabsTrigger>
           <TabsTrigger value="returned">Returned</TabsTrigger>
         </TabsList>
@@ -205,14 +219,14 @@ const LoanHistory: React.FC = () => {
                       <div>
                         <p className="text-gray-500">Requested</p>
                         <p className="font-medium">
-                          {new Date(loan.requested_at).toLocaleDateString()}
+                          {formatDate(loan.requested_at)}
                         </p>
                       </div>
                       {loan.approved_at && (
                         <div>
                           <p className="text-gray-500">Approved</p>
                           <p className="font-medium">
-                            {new Date(loan.approved_at).toLocaleDateString()}
+                            {formatDate(loan.approved_at)}
                           </p>
                         </div>
                       )}
@@ -220,7 +234,7 @@ const LoanHistory: React.FC = () => {
                         <div>
                           <p className="text-gray-500">Due Date</p>
                           <p className="font-medium">
-                            {new Date(loan.due_date).toLocaleDateString()}
+                            {formatDate(loan.due_date)}
                           </p>
                         </div>
                       )}
@@ -228,7 +242,7 @@ const LoanHistory: React.FC = () => {
                         <div>
                           <p className="text-gray-500">Returned</p>
                           <p className="font-medium">
-                            {new Date(loan.returned_at).toLocaleDateString()}
+                            {formatDate(loan.returned_at)}
                           </p>
                         </div>
                       )}
@@ -238,15 +252,6 @@ const LoanHistory: React.FC = () => {
                   {loan.status === "approved" && !loan.returned_at && (
                     <CardFooter className="pt-2 pb-4">
                       <div className="flex flex-wrap gap-3">
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => handleReturn(loan.id)}
-                          disabled={actionLoading}
-                        >
-                          <ArrowLeftCircle className="h-4 w-4 mr-2" />
-                          Return Book
-                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
